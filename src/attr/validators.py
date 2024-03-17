@@ -35,7 +35,6 @@ __all__ = [
     "min_len",
     "not_",
     "optional",
-    "provides",
     "set_disabled",
 ]
 
@@ -97,12 +96,7 @@ class _InstanceOfValidator:
         We use a callable class to be able to change the ``__repr__``.
         """
         if not isinstance(value, self.type):
-            msg = "'{name}' must be {type!r} (got {value!r} that is a {actual!r}).".format(
-                name=attr.name,
-                type=self.type,
-                actual=value.__class__,
-                value=value,
-            )
+            msg = f"'{attr.name}' must be {self.type!r} (got {value!r} that is a {value.__class__!r})."
             raise TypeError(
                 msg,
                 attr,
@@ -140,9 +134,7 @@ class _MatchesReValidator:
         We use a callable class to be able to change the ``__repr__``.
         """
         if not self.match_func(value):
-            msg = "'{name}' must match regex {pattern!r} ({value!r} doesn't)".format(
-                name=attr.name, pattern=self.pattern.pattern, value=value
-            )
+            msg = f"'{attr.name}' must match regex {self.pattern.pattern!r} ({value!r} doesn't)"
             raise ValueError(
                 msg,
                 attr,
@@ -195,56 +187,6 @@ def matches_re(regex, flags=0, func=None):
         match_func = pattern.fullmatch
 
     return _MatchesReValidator(pattern, match_func)
-
-
-@attrs(repr=False, slots=True, hash=True)
-class _ProvidesValidator:
-    interface = attrib()
-
-    def __call__(self, inst, attr, value):
-        """
-        We use a callable class to be able to change the ``__repr__``.
-        """
-        if not self.interface.providedBy(value):
-            msg = "'{name}' must provide {interface!r} which {value!r} doesn't.".format(
-                name=attr.name, interface=self.interface, value=value
-            )
-            raise TypeError(
-                msg,
-                attr,
-                self.interface,
-                value,
-            )
-
-    def __repr__(self):
-        return f"<provides validator for interface {self.interface!r}>"
-
-
-def provides(interface):
-    """
-    A validator that raises a `TypeError` if the initializer is called
-    with an object that does not provide the requested *interface* (checks are
-    performed using ``interface.providedBy(value)`` (see `zope.interface
-    <https://zopeinterface.readthedocs.io/en/latest/>`_).
-
-    :param interface: The interface to check for.
-    :type interface: ``zope.interface.Interface``
-
-    :raises TypeError: With a human readable error message, the attribute
-        (of type `attrs.Attribute`), the expected interface, and the
-        value it got.
-
-    .. deprecated:: 23.1.0
-    """
-    import warnings
-
-    warnings.warn(
-        "attrs's zope-interface support is deprecated and will be removed in, "
-        "or after, April 2024.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return _ProvidesValidator(interface)
 
 
 @attrs(repr=False, slots=True, hash=True)
@@ -426,9 +368,7 @@ class _DeepMapping:
             self.value_validator(inst, attr, value[key])
 
     def __repr__(self):
-        return (
-            "<deep_mapping validator for objects mapping {key!r} to {value!r}>"
-        ).format(key=self.key_validator, value=self.value_validator)
+        return f"<deep_mapping validator for objects mapping {self.key_validator!r} to {self.value_validator!r}>"
 
 
 def deep_mapping(key_validator, value_validator, mapping_validator=None):
@@ -640,12 +580,7 @@ class _NotValidator:
             )
 
     def __repr__(self):
-        return (
-            "<not_ validator wrapping {what!r}, capturing {exc_types!r}>"
-        ).format(
-            what=self.validator,
-            exc_types=self.exc_types,
-        )
+        return f"<not_ validator wrapping {self.validator!r}, capturing {self.exc_types!r}>"
 
 
 def not_(validator, *, msg=None, exc_types=(ValueError, TypeError)):
