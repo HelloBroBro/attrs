@@ -4,7 +4,7 @@
 import copy
 
 from ._compat import PY_3_9_PLUS, get_generic_base
-from ._make import NOTHING, _obj_setattr, fields
+from ._make import _OBJ_SETATTR, NOTHING, fields
 from .exceptions import AttrsAttributeNotFoundError
 
 
@@ -22,22 +22,21 @@ def asdict(
     Optionally recurse into other *attrs*-decorated classes.
 
     :param inst: Instance of an *attrs*-decorated class.
-    :param bool recurse: Recurse into classes that are also
-        *attrs*-decorated.
-    :param callable filter: A callable whose return code determines whether an
-        attribute or element is included (``True``) or dropped (``False``).  Is
-        called with the `attrs.Attribute` as the first argument and the
-        value as the second argument.
-    :param callable dict_factory: A callable to produce dictionaries from.  For
-        example, to produce ordered dictionaries instead of normal Python
-        dictionaries, pass in ``collections.OrderedDict``.
-    :param bool retain_collection_types: Do not convert to ``list`` when
-        encountering an attribute whose type is ``tuple`` or ``set``.  Only
-        meaningful if ``recurse`` is ``True``.
-    :param Optional[callable] value_serializer: A hook that is called for every
-        attribute or dict key/value.  It receives the current instance, field
-        and value and must return the (updated) value.  The hook is run *after*
-        the optional *filter* has been applied.
+    :param bool recurse: Recurse into classes that are also *attrs*-decorated.
+    :param ~typing.Callable filter: A callable whose return code determines
+        whether an attribute or element is included (`True`) or dropped
+        (`False`).  Is called with the `attrs.Attribute` as the first argument
+        and the value as the second argument.
+    :param ~typing.Callable dict_factory: A callable to produce dictionaries
+        from.  For example, to produce ordered dictionaries instead of normal
+        Python dictionaries, pass in ``collections.OrderedDict``.
+    :param bool retain_collection_types: Do not convert to `list` when
+        encountering an attribute whose type is `tuple` or `set`.  Only
+        meaningful if *recurse* is `True`.
+    :param typing.Callable | None value_serializer: A hook that is called for
+        every attribute or dict key/value.  It receives the current instance,
+        field and value and must return the (updated) value.  The hook is run
+        *after* the optional *filter* has been applied.
 
     :rtype: return type of *dict_factory*
 
@@ -207,18 +206,16 @@ def astuple(
     Optionally recurse into other *attrs*-decorated classes.
 
     :param inst: Instance of an *attrs*-decorated class.
-    :param bool recurse: Recurse into classes that are also
-        *attrs*-decorated.
-    :param callable filter: A callable whose return code determines whether an
-        attribute or element is included (``True``) or dropped (``False``).  Is
-        called with the `attrs.Attribute` as the first argument and the
-        value as the second argument.
-    :param callable tuple_factory: A callable to produce tuples from.  For
-        example, to produce lists instead of tuples.
-    :param bool retain_collection_types: Do not convert to ``list``
-        or ``dict`` when encountering an attribute which type is
-        ``tuple``, ``dict`` or ``set``.  Only meaningful if ``recurse`` is
-        ``True``.
+    :param bool recurse: Recurse into classes that are also *attrs*-decorated.
+    :param ~typing.Callable filter: A callable whose return code determines
+        whether an attribute or element is included (`True`) or dropped
+        (`False`).  Is called with the `attrs.Attribute` as the first argument
+        and the value as the second argument.
+    :param ~typing.Callable tuple_factory: A callable to produce tuples from.
+        For example, to produce lists instead of tuples.
+    :param bool retain_collection_types: Do not convert to `list` or `dict`
+        when encountering an attribute which type is `tuple`, `dict` or `set`.
+        Only meaningful if *recurse* is `True`.
 
     :rtype: return type of *tuple_factory*
 
@@ -362,7 +359,7 @@ def assoc(inst, **changes):
         if a is NOTHING:
             msg = f"{k} is not an attrs attribute on {new.__class__}."
             raise AttrsAttributeNotFoundError(msg)
-        _obj_setattr(new, k, v)
+        _OBJ_SETATTR(new, k, v)
     return new
 
 
@@ -466,7 +463,7 @@ def resolve_types(
         for field in fields(cls) if attribs is None else attribs:
             if field.name in hints:
                 # Since fields have been frozen we must work around it.
-                _obj_setattr(field, "type", hints[field.name])
+                _OBJ_SETATTR(field, "type", hints[field.name])
         # We store the class we resolved so that subclasses know they haven't
         # been resolved.
         cls.__attrs_types_resolved__ = cls
