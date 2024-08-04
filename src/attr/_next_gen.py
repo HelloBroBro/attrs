@@ -50,6 +50,12 @@ def define(
     :term:`fields <field>` specified using :doc:`type annotations <types>`,
     `field()` calls, or the *these* argument.
 
+    Since *attrs* patches or replaces an existing class, you cannot use
+    `object.__init_subclass__` with *attrs* classes, because it runs too early.
+    As a replacement, you can define ``__attrs_init_subclass__`` on your class.
+    It will be called by *attrs* classes that subclass it after they're
+    created. See also :ref:`init-subclass`.
+
     Args:
         slots (bool):
             Create a :term:`slotted class <slotted classes>` that's more
@@ -178,7 +184,7 @@ def define(
                   details.
 
         hash (bool | None):
-            Alias for *unsafe_hash*. *unsafe_hash* takes precedence.
+            Deprecated alias for *unsafe_hash*. *unsafe_hash* takes precedence.
 
         cache_hash (bool):
             Ensure that the object's hash code is computed only once and stored
@@ -308,10 +314,13 @@ def define(
     .. versionadded:: 22.2.0
        *unsafe_hash* as an alias for *hash* (for :pep:`681` compliance).
     .. versionchanged:: 24.1.0
-
        Instances are not compared as tuples of attributes anymore, but using a
        big ``and`` condition. This is faster and has more correct behavior for
        uncomparable values like `math.nan`.
+    .. versionadded:: 24.1.0
+       If a class has an *inherited* classmethod called
+       ``__attrs_init_subclass__``, it is executed after the class is created.
+    .. deprecated:: 24.1.0 *hash* is deprecated in favor of *unsafe_hash*.
 
     .. note::
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import abc
 import contextlib
 import copy
 import enum
@@ -304,26 +305,14 @@ def _has_own_attribute(cls, attrib_name):
     """
     Check whether *cls* defines *attrib_name* (and doesn't just inherit it).
     """
-    attr = getattr(cls, attrib_name, _SENTINEL)
-    if attr is _SENTINEL:
-        return False
-
-    for base_cls in cls.__mro__[1:]:
-        a = getattr(base_cls, attrib_name, None)
-        if attr is a:
-            return False
-
-    return True
+    return attrib_name in cls.__dict__
 
 
 def _get_annotations(cls):
     """
     Get annotations for *cls*.
     """
-    if _has_own_attribute(cls, "__annotations__"):
-        return cls.__annotations__
-
-    return {}
+    return cls.__dict__.get("__annotations__", {})
 
 
 def _collect_base_attrs(cls, taken_attr_names):
@@ -695,34 +684,28 @@ class _ClassBuilder:
     def __repr__(self):
         return f"<_ClassBuilder(cls={self._cls.__name__})>"
 
-    if PY_3_10_PLUS:
-        import abc
+    def build_class(self):
+        """
+        Finalize class based on the accumulated configuration.
 
-        def build_class(self):
-            """
-            Finalize class based on the accumulated configuration.
+        Builder cannot be used after calling this method.
+        """
+        if self._slots is True:
+            cls = self._create_slots_class()
+        else:
+            cls = self._patch_original_class()
+            if PY_3_10_PLUS:
+                cls = abc.update_abstractmethods(cls)
 
-            Builder cannot be used after calling this method.
-            """
-            if self._slots is True:
-                return self._create_slots_class()
+        # The method gets only called if it's not inherited from a base class.
+        # _has_own_attribute does NOT work properly for classmethods.
+        if (
+            getattr(cls, "__attrs_init_subclass__", None)
+            and "__attrs_init_subclass__" not in cls.__dict__
+        ):
+            cls.__attrs_init_subclass__()
 
-            return self.abc.update_abstractmethods(
-                self._patch_original_class()
-            )
-
-    else:
-
-        def build_class(self):
-            """
-            Finalize class based on the accumulated configuration.
-
-            Builder cannot be used after calling this method.
-            """
-            if self._slots is True:
-                return self._create_slots_class()
-
-            return self._patch_original_class()
+        return cls
 
     def _patch_original_class(self):
         """
@@ -1281,24 +1264,36 @@ def attrs(
        *unsafe_hash* as an alias for *hash* (for :pep:`681` compliance).
     .. deprecated:: 24.1.0 *repr_ns*
     .. versionchanged:: 24.1.0
-
        Instances are not compared as tuples of attributes anymore, but using a
        big ``and`` condition. This is faster and has more correct behavior for
        uncomparable values like `math.nan`.
+    .. versionadded:: 24.1.0
+       If a class has an *inherited* classmethod called
+       ``__attrs_init_subclass__``, it is executed after the class is created.
+    .. deprecated:: 24.1.0 *hash* is deprecated in favor of *unsafe_hash*.
     """
     if repr_ns is not None:
         import warnings
 
         warnings.warn(
             DeprecationWarning(
-                "The `repr_ns` argument is deprecated and will be removed in or after April 2025."
+                "The `repr_ns` argument is deprecated and will be removed in or after August 2025."
             ),
             stacklevel=2,
         )
 
     eq_, order_ = _determine_attrs_eq_order(cmp, eq, order, None)
 
-    # unsafe_hash takes precedence due to PEP 681.
+    # hash is deprecated & unsafe_hash takes precedence due to PEP 681.
+    if hash is not None:
+        import warnings
+
+        warnings.warn(
+            DeprecationWarning(
+                "The `hash` argument is deprecated in favor of `unsafe_hash` and will be removed in or after August 2025."
+            ),
+            stacklevel=2,
+        )
     if unsafe_hash is not None:
         hash = unsafe_hash
 
@@ -2219,15 +2214,17 @@ def _attrs_to_init_script(
         # leading comma & kw_only args
         args += f"{', ' if args else ''}*, {', '.join(kw_only_args)}"
         pre_init_kw_only_args = ", ".join(
-            [f"{kw_arg}={kw_arg}" for kw_arg in kw_only_args]
+            [
+                f"{kw_arg_name}={kw_arg_name}"
+                # We need to remove the defaults from the kw_only_args.
+                for kw_arg_name in (kwa.split("=")[0] for kwa in kw_only_args)
+            ]
         )
-        pre_init_args += (
-            ", " if pre_init_args else ""
-        )  # handle only kwargs and no regular args
+        pre_init_args += ", " if pre_init_args else ""
         pre_init_args += pre_init_kw_only_args
 
     if call_pre_init and pre_init_has_args:
-        # If pre init method has arguments, pass same arguments as `__init__`
+        # If pre init method has arguments, pass same arguments as `__init__`.
         lines[0] = f"self.__attrs_pre_init__({pre_init_args})"
 
     # Python 3.7 doesn't allow backslashes in f strings.
@@ -2867,6 +2864,19 @@ def make_class(
         True,
     )
 
+    hash = attributes_arguments.pop("hash", _SENTINEL)
+    if hash is not _SENTINEL:
+        import warnings
+
+        warnings.warn(
+            DeprecationWarning(
+                "The `hash` argument is deprecated in favor of `unsafe_hash` and will be removed in or after August 2025."
+            ),
+            stacklevel=2,
+        )
+
+        attributes_arguments["unsafe_hash"] = hash
+
     cls = _attrs(these=cls_dict, **attributes_arguments)(type_)
     # Only add type annotations now or "_attrs()" will complain:
     cls.__annotations__ = {
@@ -2879,7 +2889,7 @@ def make_class(
 # import into .validators / .converters.
 
 
-@attrs(slots=True, hash=True)
+@attrs(slots=True, unsafe_hash=True)
 class _AndValidator:
     """
     Compose many validators to a single one.
